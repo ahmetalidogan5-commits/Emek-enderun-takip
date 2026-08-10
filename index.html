@@ -10,7 +10,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <style>
+  
+      .top-actions { display: flex; gap: 8px; }
+    #passPanel { max-width: 420px; margin: 0 auto 16px; }
+    #passPanel h3 { margin: 0 0 12px; }
+    #passPanel input {
+      width: 100%; margin-bottom: 10px;
+      border: 1px solid var(--gray-200); border-radius: 12px;
+      padding: 12px; font-size: 15px;
+    }
+    #passPanel button { width: 100%; margin-top: 4px; background: var(--black); color: var(--white); }
+    #passPanel .back-btn { background: transparent; color: var(--gray-600); border: 1px solid var(--gray-200); }<style>
     :root {
       --black: #000000;
       --white: #ffffff;
@@ -307,10 +317,20 @@
           <span>👋</span>
           <span id="userLabel">-</span>
         </div>
-        <button class="logout-btn" onclick="logout()">Çıkış Yap</button>
+        <div class="top-actions">
+          <button id="changePassBtn" class="logout-btn hidden" onclick="showPassPanel()">Şifre Değiştir</button>
+          <button class="logout-btn" onclick="logout()">Çıkış Yap</button>
+        </div>      </div>
+            <div id="passPanel" class="panel hidden">
+        <h3>Şifre Değiştir</h3>
+        <input type="password" id="oldPass" placeholder="Eski şifren" />
+        <input type="password" id="newPass" placeholder="Yeni şifren (en az 6 karakter)" />
+        <input type="password" id="newPass2" placeholder="Yeni şifren (tekrar)" />
+        <div class="error-msg" id="passMsg"></div>
+        <button onclick="doChangePass()">Kaydet</button>
+        <button class="back-btn" onclick="hidePassPanel()">Vazgeç</button>
       </div>
-
-      <div class="panel hero">
+<div class="panel hero">
         <div>
           <h1 id="appTitle">Emek Enderun Takip</h1>
           <div class="subtitle" id="appSubtitle">Manevi ve Ders Takip</div>
@@ -367,7 +387,61 @@
     </div>
 
   </div>
+    // ===== ŞİFRE DEĞİŞTİRME PAKETİ =====
+    async function getCurrentPass(username) {
+      try {
+        const snap = await getDoc(doc(db, "users", username));
+        if (snap.exists() && snap.data().pass) return snap.data().pass;
+      } catch (e) {}
+      return USERS[username] ? USERS[username].pass : null;
+    }
 
+    window.loginPersonel = async function() {
+      const u = document.getElementById("personelUser").value.trim().toUpperCase();
+      const p = document.getElementById("personelPass").value;
+      const user = USERS[u];
+      const err = document.getElementById("personelError");
+      if (!user) { err.textContent = "Böyle bir kullanıcı yok."; return; }
+      const current = await getCurrentPass(u);
+      if (p !== current) { err.textContent = "Şifre hatalı."; return; }
+      try { await setDoc(doc(db, "users", u), { pass: current }, { merge: true }); } catch (e) {}
+      currentUser = { username: u, name: user.name, students: user.students, type: "personel" };
+      enterApp();
+    };
+
+    window.showPassPanel = function() {
+      document.getElementById("passPanel").classList.remove("hidden");
+      document.getElementById("passMsg").textContent = "";
+    };
+    window.hidePassPanel = function() {
+      document.getElementById("passPanel").classList.add("hidden");
+      document.getElementById("oldPass").value = "";
+      document.getElementById("newPass").value = "";
+      document.getElementById("newPass2").value = "";
+    };
+    window.doChangePass = async function() {
+      const msg = document.getElementById("passMsg");
+      msg.style.color = "#dc2626";
+      msg.textContent = "";
+      const oldP = document.getElementById("oldPass").value;
+      const newP = document.getElementById("newPass").value;
+      const newP2 = document.getElementById("newPass2").value;
+      const current = await getCurrentPass(currentUser.username);
+      if (oldP !== current) { msg.textContent = "Eski şifren hatalı."; return; }
+      if (newP.length < 6) { msg.textContent = "Yeni şifre en az 6 karakter olsun."; return; }
+      if (newP !== newP2) { msg.textContent = "Yeni şifreler aynı değil."; return; }
+      await setDoc(doc(db, "users", currentUser.username), { pass: newP }, { merge: true });
+      msg.style.color = "#16a34a";
+      msg.textContent = "Şifren değiştirildi ✅";
+      setTimeout(hidePassPanel, 1200);
+    };
+
+    const _enterApp = enterApp;
+    enterApp = function() {
+      _enterApp();
+      const btn = document.getElementById("changePassBtn");
+      if (btn) btn.classList.toggle("hidden", currentUser.type === "toplu");
+    };
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import {
